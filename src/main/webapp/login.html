@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - CSI 3540</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 300px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            color: #555;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #message {
+            margin-top: 15px;
+            padding: 10px;
+            text-align: center;
+            color: red;
+            display: none;
+        }
+    </style>
+    <script>
+        function login() {
+            var username = document.getElementById("username").value;
+            
+            if (username.trim() === "") {
+                document.getElementById("message").textContent = "Please enter a username";
+                document.getElementById("message").style.display = "block";
+                return;
+            }
+
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var xmlDoc = xhr.responseXML;
+                    var status = xmlDoc.getElementsByTagName("status")[0].childNodes[0].nodeValue;
+                    
+                    if (status === "success") {
+                        // Store username in session storage and redirect
+                        sessionStorage.setItem("username", username);
+                        window.location.href = "main.html";
+                    } else {
+                        var message = xmlDoc.getElementsByTagName("message")[0].childNodes[0].nodeValue;
+                        document.getElementById("message").textContent = message;
+                        document.getElementById("message").style.display = "block";
+                    }
+                }
+            };
+            
+            xhr.open("POST", "UserServlet", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send("action=login&username=" + encodeURIComponent(username));
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                login();
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Login</h1>
+        <label for="username">Username:</label>
+        <input type="text" id="username" placeholder="Enter your username" onkeypress="handleKeyPress(event)">
+        <button onclick="login()">Login</button>
+        <div id="message"></div>
+    </div>
+</body>
+</html>

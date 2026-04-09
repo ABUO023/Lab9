@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Main - CSI 3540</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        h1 {
+            margin: 0;
+            color: #333;
+        }
+        #currentUser {
+            font-size: 14px;
+            color: #666;
+        }
+        .logout-btn {
+            padding: 8px 16px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            background-color: #da190b;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .dropdown-section {
+            background-color: #fffacd;
+            padding: 20px;
+            border: 2px solid #ffd700;
+            border-radius: 4px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        #valueInput {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        #dropdownList {
+            border: 1px solid #999;
+            background-color: white;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+        }
+        #dropdownList li {
+            padding: 8px 10px;
+            cursor: pointer;
+            color: #333;
+        }
+        #dropdownList li:hover {
+            background-color: #f0f0f0;
+        }
+        #dropdownList li.selected {
+            background-color: #d3d3d3;
+        }
+
+        .users-list-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #usersList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #usersList li {
+            padding: 8px 12px;
+            background-color: #e8f5e9;
+            margin-bottom: 5px;
+            border-left: 4px solid #4CAF50;
+            border-radius: 2px;
+        }
+        .empty-message {
+            color: #999;
+            font-style: italic;
+        }
+
+        .message-section {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border: 1px solid #87ceeb;
+            border-radius: 4px;
+        }
+        #messagesArea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            font-family: monospace;
+            overflow-y: auto;
+        }
+        .message-input-section {
+            margin-top: 20px;
+        }
+        #messageInput {
+            width: 100%;
+            height: 80px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            font-family: Arial, sans-serif;
+        }
+        .send-btn {
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .send-btn:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+    <script>
+        var currentUsername = "";
+        var dropdownTimer = null;
+        var usersListTimer = null;
+        var messagesTimer = null;
+        var lastMessageIndex = 0;
+
+        window.onload = function() {
+            currentUsername = sessionStorage.getItem("username");
+            if (!currentUsername) {
+                window.location.href = "login.html";
+                return;
+            }
+            
+            document.getElementById("currentUser").textContent = "Logged in as: " + currentUsername;
+            
+            // Initialize dropdown
+            initializeDropdown();
+            
+            // Start fetching users list at regular intervals (every 2 seconds)
+            updateUsersList();
+            usersListTimer = setInterval(updateUsersList, 2000);
+            
+            // Start fetching messages at regular intervals (every 2 seconds)
+            updateMessages();
+            messagesTimer = setInterval(updateMessages, 2000);
+        };
+
+        window.onbeforeunload = function() {
+            if (dropdownTimer) clearInterval(dropdownTimer);
+            if (usersListTimer) clearInterval(usersListTimer);
+            if (messagesTimer) clearInterval(messagesTimer);
+        };
+
+        function initializeDropdown() {
+            var input = document.getElementById("valueInput");
+            input.addEventListener("focus", function() {
+                fetchDropdownValues();
+            });
+            input.addEventListener("input", function() {
+                filterDropdown();
+            });
+            document.addEventListener("click", function(event) {
+                if (event.target.id !== "valueInput" && event.target.id !== "dropdownList") {
+                    document.getElementById("dropdownList").style.display = "none";
+                }
+            });
+        }
+
+        function fetchDropdownValues() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var xmlDoc = xhr.responseXML;
+                    var values = xmlDoc.getElementsByTagName("value");
+                    var list = document.getElementById("dropdownList");
+                    list.innerHTML = "";
+                    
+                    for (var i = 0; i < values.length; i++) {
+                        var li = document.createElement("li");
+                        li.textContent = values[i].childNodes[0].nodeValue;
+                        li.onclick = function(text) {
+                            return function() {
+                                document.getElementById("valueInput").value = text;
+                                document.getElementById("dropdownList").style.display = "none";
+                            };
+                        }(values[i].childNodes[0].nodeValue);
+                        list.appendChild(li);
+                    }
+                    
+                    if (values.length > 0) {
+                        list.style.display = "block";
+                    }
+                }
+            };
+            
+            xhr.open("GET", "DropdownServlet", true);
+            xhr.send();
+        }
+
+        function filterDropdown() {
+            var input = document.getElementById("valueInput").value.toLowerCase();
+            var list = document.getElementById("dropdownList");
+            var items = list.getElementsByTagName("li");
+            
+            if (input === "") {
+                list.style.display = "none";
+                return;
+            }
+            
+            list.style.display = "block";
+            for (var i = 0; i < items.length; i++) {
+                var text = items[i].textContent.toLowerCase();
+                if (text.indexOf(input) > -1) {
+                    items[i].style.display = "";
+                } else {
+                    items[i].style.display = "none";
+                }
+            }
+        }
+
+        function updateUsersList() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var xmlDoc = xhr.responseXML;
+                    var users = xmlDoc.getElementsByTagName("user");
+                    var list = document.getElementById("usersList");
+                    list.innerHTML = "";
+                    
+                    if (users.length === 0) {
+                        var li = document.createElement("li");
+                        li.className = "empty-message";
+                        li.textContent = "No users online";
+                        list.appendChild(li);
+                    } else {
+                        for (var i = 0; i < users.length; i++) {
+                            var li = document.createElement("li");
+                            li.textContent = users[i].childNodes[0].nodeValue;
+                            list.appendChild(li);
+                        }
+                    }
+                }
+            };
+            
+            xhr.open("GET", "UserServlet?action=getUsers", true);
+            xhr.send();
+        }
+
+        function sendMessage() {
+            var message = document.getElementById("messageInput").value;
+            
+            if (message.trim() === "") {
+                return;
+            }
+
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    document.getElementById("messageInput").value = "";
+                    updateMessages();
+                }
+            };
+            
+            xhr.open("POST", "MessageServlet", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send("action=sendMessage&username=" + encodeURIComponent(currentUsername) + "&message=" + encodeURIComponent(message));
+        }
+
+        function updateMessages() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var xmlDoc = xhr.responseXML;
+                    var messages = xmlDoc.getElementsByTagName("message");
+                    var textarea = document.getElementById("messagesArea");
+                    
+                    for (var i = 0; i < messages.length; i++) {
+                        var msgElement = messages[i];
+                        var sender = msgElement.getElementsByTagName("sender")[0].childNodes[0].nodeValue;
+                        var text = msgElement.getElementsByTagName("text")[0].childNodes[0].nodeValue;
+                        textarea.value += sender + ": " + text + "\n";
+                    }
+                    
+                    // Auto-scroll to bottom
+                    textarea.scrollTop = textarea.scrollHeight;
+                    lastMessageIndex += messages.length;
+                }
+            };
+            
+            xhr.open("GET", "MessageServlet?action=getMessages&lastIndex=" + lastMessageIndex, true);
+            xhr.send();
+        }
+
+        function logout() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4) {
+                    sessionStorage.removeItem("username");
+                    window.location.href = "login.html";
+                }
+            };
+            
+            xhr.open("POST", "UserServlet", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send("action=logout");
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CSI 3540 - DOM Events & AJAX</h1>
+            <div>
+                <div id="currentUser"></div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <div class="section">
+            <h2>1. Dynamic Dropdown Menu</h2>
+            <div class="dropdown-section">
+                <label for="valueInput">Entrez une valeur:</label>
+                <div style="position: relative;">
+                    <input type="text" id="valueInput" placeholder="Start typing...">
+                    <ul id="dropdownList"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>2. Online Users List (Updated via AJAX)</h2>
+            <div class="users-list-section">
+                <ul id="usersList">
+                    <li class="empty-message">Loading...</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Broadcast Messages</h2>
+            <div class="message-section">
+                <h3>Messages:</h3>
+                <textarea id="messagesArea" readonly></textarea>
+                
+                <div class="message-input-section">
+                    <label for="messageInput">Send a message:</label>
+                    <textarea id="messageInput" placeholder="Type your message here..."></textarea>
+                    <button class="send-btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
