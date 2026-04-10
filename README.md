@@ -4,6 +4,7 @@ Complete AJAX web application with real-time user list and messaging.
 
 # Demo :
 
+Demo is available in [assets/lab9-demo.mp4](./assets/lab9-demo.mp4)
 
 ## Quick Start
 
